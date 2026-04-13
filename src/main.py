@@ -15,7 +15,10 @@ os.chdir(base_path)
 folder_path = "./Музыка"
 os.makedirs(folder_path, exist_ok=True)
 
-client = Client(token='').init()
+with open('token.txt', 'r', encoding='utf-8') as f:
+    token = f.read().strip()
+    
+client = Client(token=token).init()
 
 liked_tracks = client.users_likes_tracks()
 i = 0
