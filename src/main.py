@@ -19,7 +19,7 @@ client = Client(token='').init()
 
 liked_tracks = client.users_likes_tracks()
 i = 0
-with open('downloading.txt', 'r+', encoding='utf-8') as f:
+with open('downloading.txt', 'a+', encoding='utf-8') as f:
     data = f.readlines()
     
     for id in data:
