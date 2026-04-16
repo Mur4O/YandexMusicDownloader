@@ -69,4 +69,4 @@ with open('downloading.txt', 'r+', encoding='utf-8') as f:
                     audiofile.tag.save()
                     
                     # Перерыв перед следующим запросом
-                    time.sleep(1)
+                    time.sleep(2)
