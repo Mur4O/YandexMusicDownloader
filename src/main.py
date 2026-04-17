@@ -80,6 +80,8 @@ def download():
                         raw_name = f'{fav_track.artists[0].name} - {fav_track.title}'
                         clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
                         file_path = f'{download_path}/{clean_name}.mp3'
+                        f.seek(0, 2)  # Перемещаемся в конец файла
+                        f.write(f'{clean_name}\n')
                         fav_track.download(file_path)
                         i += 1
                         print(f'Скачан файл {fav_track.title}')
@@ -112,6 +114,8 @@ def download():
                                 raw_name = f'{track.artists[0].name} - {track.title}{' ' + track.version if track.version is not None else ''}'
                                 clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
                                 file_path = f'{album_path}/{clean_name}.mp3'
+                                f.seek(0, 2)  # Перемещаемся в конец файла
+                                f.write(f'{clean_name}\n')
                                 track.download(file_path)
                                 i += 1
                                 print(f'Скачан файл {track.title} ({track.id}) по пути {file_path}')
