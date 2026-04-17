@@ -82,7 +82,7 @@ def download():
                         file_path = f'{download_path}/{clean_name}.mp3'
                         fav_track.download(file_path)
                         i += 1
-                        print(f'Скачан файл {i}')
+                        print(f'Скачан файл {fav_track.title}')
                         
                         time.sleep(0.1)
                 
@@ -99,10 +99,9 @@ def download():
                         
                         # Перерыв перед следующим запросом
                         time.sleep(2)
-                        
                     
                     if scenario == 2:
-                        raw_name = f'{fav_track.artists[0].name} - {album.title}'
+                        raw_name = f'{album.title}'
                         clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
                         album_path = f'{folder_path}/{clean_name}'
                         os.makedirs(album_path, exist_ok=True)
@@ -110,12 +109,12 @@ def download():
                         # Перебираем все диски и треки в альбоме
                         for volume in album.volumes:
                             for track in volume:
-                                raw_name = f'{track.artists[0].name} - {track.title}'
+                                raw_name = f'{track.artists[0].name} - {track.title}{' ' + track.version if track.version is not None else ''}'
                                 clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
                                 file_path = f'{album_path}/{clean_name}.mp3'
                                 track.download(file_path)
                                 i += 1
-                                print(f'Скачан файл {i}')
+                                print(f'Скачан файл {track.title} ({track.id}) по пути {file_path}')
                                 
                                 time.sleep(0.1)
                         
