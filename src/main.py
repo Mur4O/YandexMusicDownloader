@@ -23,7 +23,8 @@ base_path = os.path.dirname(os.path.abspath(__file__))
 os.chdir(base_path)
 
 # Создаём папку если не существует
-folder_path = Path('./Музыка')
+# folder_path = Path('~/Music')
+folder_path = Path(os.path.expanduser("~/Music"))
 os.makedirs(folder_path, exist_ok=True)
     
 # Проходимся по всем файлам .mp3 рекурсивно
