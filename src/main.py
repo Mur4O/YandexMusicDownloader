@@ -23,28 +23,22 @@ base_path = os.path.dirname(os.path.abspath(__file__))
 os.chdir(base_path)
 
 # Создаём папку если не существует
-folder_path = "./Музыка"
+# folder_path = Path('~/Music')
+folder_path = Path(os.path.expanduser("~/Music"))
 os.makedirs(folder_path, exist_ok=True)
-
-# Создаём кэш если не существует, а если существует - чистим
-file_path = Path("downloading.txt")
-file_path.touch(exist_ok=True)
-file_path.write_text("")
-
-# Записываем в кэш идентификаторы уже сакчанных файлов
-with open('downloading.txt', 'r+', encoding='utf-8') as f:
-    dir_path = Path(folder_path)
     
-    # Проходимся по всем файлам .mp3 рекурсивно
-    for mp3_file in dir_path.rglob("*.mp3"):
-        audiofile = eyed3.load(str(mp3_file))
-        
-        # if audiofile.tag and hasattr(audiofile.tag, 'user_text_frames'):
+# Проходимся по всем файлам .mp3 рекурсивно
+downloaded = []
+for mp3_file in folder_path.rglob("*.mp3"):
+    audiofile = eyed3.load(str(mp3_file))
+    
+    try:
         user_frame = audiofile.tag.user_text_frames.get('id').text
-        print(user_frame)
         if user_frame:
-            f.seek(0, 2)  # Перемещаемся в конец файла
-            f.write(f'{user_frame}\n')
+            downloaded.append(user_frame)
+    except: # Если в прошлый раз случилась ошибка в процессе скачивания файла, то удаляем его
+        os.remove(mp3_file)
+        print(f'Удалён файл {mp3_file}')
 
 # Определяем пользователя
 with open('token.txt', 'r', encoding='utf-8') as f:
@@ -53,89 +47,117 @@ client = Client(token=token).init()
 
 # Вытягиваем любимые треки
 liked_tracks = client.users_likes_tracks()
-summary = len(liked_tracks)
+# liked_tracks = reversed(liked_tracks)
+    
+def scenario1(track, album):
+    if track.id not in downloaded:
+        downloaded.append(track.id)
+        download_path = f'{folder_path}/Любимые песни'
+        os.makedirs(download_path, exist_ok=True)
+        raw_name = f'{track.artists[0].name} - {track.title}'
+        clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
+        file_path = f'{download_path}/{clean_name}.mp3'
+        track.download(file_path)
+        print(f'Скачан файл {track.title}')
+        
+        time.sleep(0.1)
 
-def download():
-    try:
-        # Качаем недостающее
-        with open('downloading.txt', 'r+', encoding='utf-8') as f:    
-            data = f.readlines()
-            for id in data:
-                data[data.index(id)] = id.replace('\n', '') # Поиск в файлике-кэше
+        audiofile = eyed3.load(file_path)
+        if audiofile.tag is None:
+            audiofile.initTag()
             
-            i = 0
-            for fav_track in liked_tracks:
-                if not fav_track.id in data:
-                    # f.seek(0, 2)  # Перемещаемся в конец файла
-                    # f.write(f'{fav_track.id}\n')
+        try:
+            try:
+                cover_bytes = album.download_cover_bytes(size='1000x1000')
+            except:
+                cover_bytes = track.download_cover_bytes(size='1000x1000')
+            audiofile.tag.images.set(3, cover_bytes, "image/jpeg")
+        except:
+            pass
+        
+        if album.title is not None:
+            audiofile.tag.album = album.title
+            audiofile.tag.genre = album.genre
+        audiofile.tag.artist = track.artists[0].name
+        audiofile.tag.title = track.title
+        audiofile.tag.save()
+        
+        # Перерыв перед следующим запросом
+        time.sleep(2)
+    
+def scenario2(track, album):
+    if album is None:
+        raw_name = f'{track.title}'
+    else:
+        raw_name = f'{album.title}'
+    clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
+    album_path = f'{folder_path}/{clean_name}'
+    os.makedirs(album_path, exist_ok=True)
+    
+    if album.title is None:
+        scenario1(track, album)
+    else:
+        # Перебираем все диски и треки в альбоме
+        for volume in album.volumes:
+            for track in volume:
+                if track.id not in downloaded:
+                    raw_name = f'{track.artists[0].name} - {track.title}{' ' + track.version if track.version is not None else ''}'
+                    clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
+                    file_path = f'{album_path}/{clean_name}.mp3'
+                    downloaded.append(track.id)
+                    track.download(file_path)
+                    print(f'Скачан трек {track.title} ({track.id}) по пути {file_path}')
                     
-                    fav_track = fav_track.fetch_track()
-                    album = client.albums_with_tracks(fav_track.albums[0].id) # Обложкой песен будет обложка альбома
-                    # print(album.genre)
-                    cover_bytes = album.download_cover_bytes(size='1000x1000')
-                    
-                    if scenario == 1:
-                        download_path = f'{folder_path}/Любимые песни'
-                        os.makedirs(download_path, exist_ok=True)
-                        raw_name = f'{fav_track.artists[0].name} - {fav_track.title}'
-                        clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
-                        file_path = f'{download_path}/{clean_name}.mp3'
-                        fav_track.download(file_path)
-                        i += 1
-                        print(f'Скачан файл {i}')
+                    time.sleep(0.1)
+            
+                    audiofile = eyed3.load(file_path)
+                    if audiofile.tag is None:
+                        audiofile.initTag()
                         
-                        time.sleep(0.1)
-                
-                        audiofile = eyed3.load(file_path)
-                        if audiofile.tag is None:
-                            audiofile.initTag()
-                            
+                    try:
+                        try:
+                            cover_bytes = album.download_cover_bytes(size='1000x1000')
+                        except:
+                            cover_bytes = track.download_cover_bytes(size='1000x1000')
                         audiofile.tag.images.set(3, cover_bytes, "image/jpeg")
-                        audiofile.tag.artist = fav_track.artists[0].name
-                        audiofile.tag.album = album.title
-                        audiofile.tag.title = fav_track.title
-                        audiofile.tag.genre = album.genre
-                        audiofile.tag.save()
+                    except:
+                        pass
                         
-                        # Перерыв перед следующим запросом
-                        time.sleep(2)
-                        
+                    audiofile.tag.artist = track.artists[0].name
+                    audiofile.tag.title = track.title
+                    audiofile.tag.user_text_frames.set(f'{track.id}', 'id')
                     
-                    if scenario == 2:
-                        raw_name = f'{fav_track.artists[0].name} - {album.title}'
-                        clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
-                        album_path = f'{folder_path}/{clean_name}'
-                        os.makedirs(album_path, exist_ok=True)
-                        
-                        # Перебираем все диски и треки в альбоме
-                        for volume in album.volumes:
-                            for track in volume:
-                                raw_name = f'{track.artists[0].name} - {track.title}'
-                                clean_name = re.sub(r'[<>:"/\\|?*]', '', raw_name) # Экранирование от кривых названий
-                                file_path = f'{album_path}/{clean_name}.mp3'
-                                track.download(file_path)
-                                i += 1
-                                print(f'Скачан файл {i}')
-                                
-                                time.sleep(0.1)
-                        
-                                audiofile = eyed3.load(file_path)
-                                if audiofile.tag is None:
-                                    audiofile.initTag()
-                                    
-                                audiofile.tag.images.set(3, cover_bytes, "image/jpeg")
-                                audiofile.tag.artist = track.artists[0].name
-                                audiofile.tag.album = album.title
-                                audiofile.tag.title = track.title
-                                audiofile.tag.user_text_frames.set(f'{track.id}', 'id')
-                                audiofile.tag.genre = album.genre
-                                audiofile.tag.save()
-                                
-                                # Перерыв перед следующим запросом
-                                time.sleep(2)
+                    audiofile.tag.album = album.title
+                    audiofile.tag.genre = album.genre
+                    audiofile.tag.save()
+                    
+                    # Перерыв перед следующим запросом
+                    time.sleep(2)
+                
+def download():
+    try:            
+        for fav_track in liked_tracks:
+            fav_track = fav_track.fetch_track()
+            album = client.albums_with_tracks(fav_track.albums[0].id) # Обложкой песен будет обложка альбома
+            print(f'Скачиваем альбом {album.title}')
+            if album.title is None:
+                print(album)
+            
+            if scenario == 1:
+                scenario1(fav_track, album)
+            
+            if scenario == 2:
+                scenario2(fav_track, album)
+            # Перерыв перед следующим запросом
+            time.sleep(1)
+                    
     # Перезапускаемся в случае тайм-аута
     except yme.TimedOutError as e:
         print(e)
+        download()
+    except yme.NetworkError as e:
+        print(e)
+        time.sleep(20)
         download()
         
     print('Всё скачано')
